@@ -72,6 +72,8 @@ var (
 var screenTitles = map[screen]string{
 	screenCategories: "카테고리",
 	screenItems:      "항목 선택",
+	screenParts:      "부품 조립",
+	screenPartColor:  "색상 고르기",
 	screenConfirm:    "적용 확인",
 	screenCorrupt:    "마커 손상 감지",
 	screenResults:    "적용 결과",
@@ -279,6 +281,10 @@ func (m model) View() string {
 		body = m.viewCategoriesAndCart(contentHeight)
 	case screenItems:
 		body = m.viewItemsAndCart(contentHeight)
+	case screenParts:
+		body = m.viewParts(contentHeight)
+	case screenPartColor:
+		body = m.viewPartColor(m.width, contentHeight)
 	case screenConfirm:
 		body = m.viewConfirm(m.width, contentHeight)
 	case screenCorrupt:
@@ -302,6 +308,10 @@ func (m model) footerHint() string {
 		return hint
 	case screenItems:
 		return "←/h 뒤로 · space/enter 담기/빼기 · / 검색 · a 적용 확인 · q 종료"
+	case screenParts:
+		return "tab 목록/조립 전환 · enter 담기·색 편집 · J/K 순서 이동 · x 빼기 · ←/h 뒤로 · a 적용 확인 · q 종료"
+	case screenPartColor:
+		return "hjkl/방향키 색 이동 · enter 확정 · esc 취소"
 	case screenConfirm:
 		return "←/h 뒤로 · enter 적용 · q 종료"
 	case screenCorrupt:
@@ -569,6 +579,72 @@ func (m model) viewItemsAndCart(height int) string {
 	listPanel := panel(title, listWidth, height, body)
 	cart := m.renderCartPanel(cartWidth, height)
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPanel, panelGap, cart)
+}
+
+// viewParts renders the "compose" category screen: available parts on
+// the left (browse and add, like the normal item list but multi-add
+// instead of radio-select), and the assembled sequence on the right
+// (reorder/recolor/remove). No scrolling — compose categories are
+// expected to have a handful of parts, not dozens.
+func (m model) viewParts(height int) string {
+	rightWidth := 34
+	if rightWidth > m.width/3 {
+		rightWidth = m.width / 3
+	}
+	leftWidth := m.width - rightWidth - len(panelGap)
+	innerWidth := leftWidth - 8
+
+	parts := m.currentItemList()
+	var left strings.Builder
+	if len(parts) == 0 {
+		left.WriteString(mutedStyle.Render("사용 가능한 부품이 없습니다."))
+	} else {
+		for i, it := range parts {
+			focused := m.partsFocus == 0 && m.partsCursor == i
+			left.WriteString(renderItemCard(innerWidth, focused, false, it))
+			if i < len(parts)-1 {
+				left.WriteString("\n\n")
+			}
+		}
+	}
+	leftPanel := panel("사용 가능한 부품", leftWidth, height, left.String())
+
+	assembled := m.assembled[m.currentCategoryID]
+	var right strings.Builder
+	if len(assembled) == 0 {
+		right.WriteString(mutedStyle.Render("아직 담긴 부품이 없습니다.\n왼쪽에서 space/enter로 담아보세요."))
+	} else {
+		rightInner := rightWidth - 6
+		for i, ap := range assembled {
+			dot := lipgloss.NewStyle().Foreground(lipgloss.Color(ap.Picker.hex())).Render("●")
+			text := fmt.Sprintf("%s %d. %s", dot, i+1, ap.Item.Name)
+			style := rowStyle
+			if m.partsFocus == 1 && m.assembledCursor == i {
+				style = rowSelectedStyle
+			}
+			right.WriteString(style.Width(rightInner).Render(text))
+			right.WriteString("\n")
+		}
+	}
+	rightPanel := panel("조립된 순서", rightWidth, height, strings.TrimRight(right.String(), "\n"))
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, panelGap, rightPanel)
+}
+
+// viewPartColor shows the color grid plus a live-colored preview of the
+// part currently being edited, so moving the cursor visibly changes what
+// that part will actually look like.
+func (m model) viewPartColor(width, height int) string {
+	list := m.assembled[m.currentCategoryID]
+	name := ""
+	if m.editingIdx < len(list) {
+		name = list[m.editingIdx].Item.Name
+	}
+
+	preview := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(m.picker.hex())).Render(name)
+	body := preview + "\n\n" + renderColorPicker(m.picker, "이 부품의 색")
+
+	return panel(fmt.Sprintf("색상 고르기 — %s", name), width, height, body)
 }
 
 func (m model) viewConfirm(width, height int) string {

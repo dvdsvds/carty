@@ -25,6 +25,8 @@ type screen int
 const (
 	screenCategories screen = iota
 	screenItems
+	screenParts
+	screenPartColor
 	screenConfirm
 	screenResults
 	screenChangelog
@@ -41,6 +43,10 @@ type planEntry struct {
 	Category   catalog.Category
 	TargetFile string
 	Auto       bool
+	// Parts is set instead of Item mattering, for "compose" categories:
+	// the body gets assembled from these parts (see composePartsBody)
+	// rather than fetched directly from one item's file.
+	Parts []assembledPart
 }
 
 type model struct {
@@ -65,6 +71,18 @@ type model struct {
 
 	// cart holds at most one selected item per category id (radio select).
 	cart map[string]catalog.Item
+
+	// assembled holds, for "compose" categories only, an ordered sequence
+	// of parts (each with its own chosen color) instead of a single
+	// radio-selected item. Keyed by category id.
+	assembled map[string][]assembledPart
+
+	partsFocus       int // 0 = browsing available parts, 1 = the assembled sequence
+	partsCursor      int
+	assembledCursor  int
+	picker           colorPicker
+	editingIdx       int  // index into assembled[currentCategoryID] being colored
+	editingIsNewPart bool // true if esc should delete rather than keep the old color
 
 	searching     bool
 	searchInput   string
@@ -98,6 +116,7 @@ func InitialModel() model {
 
 	m := model{
 		cart:         make(map[string]catalog.Item),
+		assembled:    make(map[string][]assembledPart),
 		categoryByID: make(map[string]catalog.Category),
 		home:         home,
 		cacheDir:     cacheDir,
@@ -300,7 +319,7 @@ func (m *model) buildPlan() {
 		if !c.Required {
 			continue
 		}
-		found := false
+		found := len(m.assembled[c.ID]) > 0
 		for _, ri := range resolved {
 			if ri.Item.CategoryID == c.ID {
 				found = true
@@ -331,6 +350,23 @@ func (m *model) buildPlan() {
 			Auto:       ri.Auto,
 		})
 	}
+
+	for categoryID, parts := range m.assembled {
+		if len(parts) == 0 {
+			continue
+		}
+		cat, ok := m.categoryByID[categoryID]
+		if !ok {
+			continue
+		}
+		m.plan = append(m.plan, planEntry{
+			Item:       catalog.Item{Name: fmt.Sprintf("%s (%d개 부품)", cat.Label, len(parts)), CategoryID: categoryID},
+			Category:   cat,
+			TargetFile: catalog.ResolveTargetFile(cat, m.home),
+			Parts:      parts,
+		})
+	}
+
 	sort.SliceStable(m.plan, func(i, j int) bool { return m.plan[i].Category.Priority < m.plan[j].Category.Priority })
 }
 
@@ -362,7 +398,13 @@ func (m *model) advanceApply() {
 		pe := m.plan[m.planIndex]
 		m.appliedCategories[pe.Category.ID] = true
 
-		body, err := fetchItemBody(m.cacheDir, pe.Item)
+		var body string
+		var err error
+		if pe.Parts != nil {
+			body, err = composePartsBody(m.cacheDir, pe.Parts)
+		} else {
+			body, err = fetchItemBody(m.cacheDir, pe.Item)
+		}
 		if err != nil {
 			m.results = append(m.results, ApplyResult{Name: pe.Item.Name, Err: err})
 			m.planIndex++
@@ -382,8 +424,12 @@ func (m *model) advanceApply() {
 			continue
 		}
 
+		itemPath := pe.Item.FilePath
+		if pe.Parts != nil {
+			itemPath = "compose:" + pe.Category.ID
+		}
 		m.applyState[pe.Category.ID] = state.Entry{
-			ItemPath:   pe.Item.FilePath,
+			ItemPath:   itemPath,
 			Item:       pe.Item.Name,
 			Version:    pe.Item.Version,
 			TargetFile: pe.TargetFile,
@@ -454,6 +500,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateCategories(keyMsg)
 	case screenItems:
 		return m.updateItems(keyMsg)
+	case screenParts:
+		return m.updateParts(keyMsg)
+	case screenPartColor:
+		return m.updatePartColor(keyMsg)
 	case screenConfirm:
 		return m.updateConfirm(keyMsg)
 	case screenCorrupt:
@@ -531,10 +581,18 @@ func (m model) updateCategories(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "right", "l", "enter":
 		if len(m.categories) > 0 {
-			m.currentCategoryID = m.categories[m.catCursor].ID
-			m.itemCursor = 0
-			m.itemScroll = 0
-			m.screen = screenItems
+			cat := m.categories[m.catCursor]
+			m.currentCategoryID = cat.ID
+			if cat.ApplyMethod == "compose" {
+				m.partsCursor = 0
+				m.assembledCursor = 0
+				m.partsFocus = 0
+				m.screen = screenParts
+			} else {
+				m.itemCursor = 0
+				m.itemScroll = 0
+				m.screen = screenItems
+			}
 		}
 	case "a":
 		m.buildPlan()
