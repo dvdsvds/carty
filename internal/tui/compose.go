@@ -17,14 +17,19 @@ type assembledPart struct {
 	Picker colorPicker
 }
 
-// composePartsBody assembles a compose category's final body: a leading
-// "PROMPT=\"\"" so the sequence starts from a clean slate regardless of
-// whatever else may already be in the target file, then each part's raw
-// body in order with "{{color}}" substituted for that part's chosen hex.
-// Parts are expected to build up PROMPT incrementally (PROMPT+=...), the
-// same idiom oh-my-zsh's own multi-line themes use.
+// composePartsBody assembles a compose category's final body:
+// "setopt PROMPT_SUBST" (without it, zsh never re-evaluates a
+// $(command) embedded in PROMPT — parts like git-branch.zsh's
+// PROMPT+='$(git_prompt_info)' would show up as that literal text
+// instead of the actual branch name) plus a leading "PROMPT=\"\"" so
+// the sequence starts from a clean slate regardless of whatever else
+// may already be in the target file, then each part's raw body in
+// order with "{{color}}" substituted for that part's chosen hex. Parts
+// build up PROMPT incrementally (PROMPT+=...), the same idiom
+// oh-my-zsh's own multi-line themes use.
 func composePartsBody(cacheDir string, parts []assembledPart) (string, error) {
 	var b strings.Builder
+	b.WriteString("setopt PROMPT_SUBST\n")
 	b.WriteString("PROMPT=\"\"\n")
 	for _, p := range parts {
 		raw, err := fetchItemBody(cacheDir, p.Item)

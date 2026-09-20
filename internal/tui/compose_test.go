@@ -74,8 +74,11 @@ func TestComposePartsBodySubstitutesColorAndPrependsCleanSlate(t *testing.T) {
 	}
 
 	lines := strings.Split(body, "\n")
-	if lines[0] != `PROMPT=""` {
-		t.Fatalf("expected body to start with a clean PROMPT reset, got %q", lines[0])
+	if lines[0] != "setopt PROMPT_SUBST" {
+		t.Fatalf("expected body to start by enabling PROMPT_SUBST (needed for $(...) in PROMPT to actually evaluate), got %q", lines[0])
+	}
+	if lines[1] != `PROMPT=""` {
+		t.Fatalf("expected a clean PROMPT reset right after, got %q", lines[1])
 	}
 	if !strings.Contains(body, parts[0].Picker.hex()+"}A") {
 		t.Fatalf("part A's color not substituted correctly, got:\n%s", body)
