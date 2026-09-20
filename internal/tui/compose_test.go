@@ -91,6 +91,37 @@ func TestComposePartsBodySubstitutesColorAndPrependsCleanSlate(t *testing.T) {
 	}
 }
 
+func TestComposePartsBodySubstitutesFontColor(t *testing.T) {
+	cacheDir := t.TempDir()
+
+	if err := cache.SaveFile(cacheDir, "zsh-custom/git.zsh", []byte("---\nname: Git\n---\nPROMPT+=\"%K{{{color}}}%F{{{font_color}}} ⎇ %k%f\"")); err != nil {
+		t.Fatal(err)
+	}
+
+	parts := []assembledPart{
+		{
+			Item:       catalog.Item{FilePath: "zsh-custom/git.zsh"},
+			Picker:     colorPicker{hueIndex: 0, satIndex: 0},
+			FontPicker: colorPicker{hueIndex: 16, satIndex: 0},
+		},
+	}
+
+	body, err := composePartsBody(cacheDir, parts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(body, "%K{"+parts[0].Picker.hex()+"}") {
+		t.Fatalf("background color not substituted, got:\n%s", body)
+	}
+	if !strings.Contains(body, "%F{"+parts[0].FontPicker.hex()+"}") {
+		t.Fatalf("font color not substituted, got:\n%s", body)
+	}
+	if strings.Contains(body, "{{font_color}}") {
+		t.Fatalf("a {{font_color}} placeholder was left unsubstituted:\n%s", body)
+	}
+}
+
 func TestUpdatePartsAddOpensColorPickerForNewPart(t *testing.T) {
 	m := composeTestModel()
 
@@ -151,6 +182,55 @@ func TestEscOnExistingPartKeepsItsColor(t *testing.T) {
 	if m4.assembled["zsh-custom"][0].Picker != confirmedColor {
 		t.Fatalf("esc must discard the in-progress nudge and keep the previously confirmed color, got %+v want %+v",
 			m4.assembled["zsh-custom"][0].Picker, confirmedColor)
+	}
+}
+
+func TestPartWithFontColorChainsThroughTwoStages(t *testing.T) {
+	cacheDir := t.TempDir()
+	if err := cache.SaveFile(cacheDir, "zsh-custom/test-git-branch.zsh", []byte("---\nname: git 브랜치\n---\nPROMPT+=\"%K{{{color}}}%F{{{font_color}}} ⎇ %k%f\"")); err != nil {
+		t.Fatal(err)
+	}
+
+	m := composeTestModel()
+	m.cacheDir = cacheDir
+	gitItem := catalog.Item{Name: "git 브랜치", CategoryID: "zsh-custom", FilePath: "zsh-custom/test-git-branch.zsh"}
+	m.itemsByCategory["zsh-custom"] = append(m.itemsByCategory["zsh-custom"], gitItem)
+	m.partsCursor = len(m.itemsByCategory["zsh-custom"]) - 1
+
+	updated, _ := m.updateParts(key("enter")) // add the git-branch part
+	m2 := updated.(model)
+	if !m2.editingNeedsFontColor {
+		t.Fatal("expected a part with {{font_color}} in its body to set editingNeedsFontColor")
+	}
+
+	updated, _ = m2.updatePartColor(key("l")) // nudge background
+	m2 = updated.(model)
+	updated, _ = m2.updatePartColor(key("enter")) // confirm background
+	m3 := updated.(model)
+
+	if m3.screen != screenPartColor {
+		t.Fatalf("expected confirming the background to chain into the font-color stage, got screen %v", m3.screen)
+	}
+	if m3.editingColorStage != 1 {
+		t.Fatalf("expected editingColorStage to advance to 1, got %d", m3.editingColorStage)
+	}
+
+	bgPicker := m3.assembled["zsh-custom"][0].Picker
+
+	updated, _ = m3.updatePartColor(key("l")) // nudge font color
+	m3 = updated.(model)
+	updated, _ = m3.updatePartColor(key("enter")) // confirm font color
+	m4 := updated.(model)
+
+	if m4.screen != screenParts {
+		t.Fatalf("expected confirming the font color to return to screenParts, got %v", m4.screen)
+	}
+	got := m4.assembled["zsh-custom"][0]
+	if got.Picker != bgPicker {
+		t.Fatalf("background color should not change while picking font color, got %+v want %+v", got.Picker, bgPicker)
+	}
+	if got.FontPicker == (colorPicker{}) {
+		t.Fatal("expected a non-zero font color to have been recorded")
 	}
 }
 

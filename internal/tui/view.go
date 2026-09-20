@@ -643,7 +643,7 @@ func partPreviewText(it catalog.Item) string {
 	case "zsh-custom/path.zsh":
 		return "~/project"
 	case "zsh-custom/git-branch.zsh":
-		return "git:(main)"
+		return "⎇ main"
 	case "zsh-custom/prompt-char.zsh":
 		return "❯"
 	default:
@@ -654,26 +654,41 @@ func partPreviewText(it catalog.Item) string {
 // viewPartColor shows the color grid plus a live preview of the actual
 // part being edited (not just its name) rendered in the picker's
 // current color, so moving the cursor visibly changes what that part
-// will really look like in the prompt.
+// will really look like in the prompt. Parts with a separate font color
+// (editingNeedsFontColor) go through two stages: stage 0 picks the
+// background while the text stays a fixed black so the background is
+// easy to judge, stage 1 locks the background to what was just chosen
+// and lets the live cursor drive the text color instead.
 func (m model) viewPartColor(width, height int) string {
 	list := m.assembled[m.currentCategoryID]
 	var it catalog.Item
+	var part assembledPart
 	if m.editingIdx < len(list) {
-		it = list[m.editingIdx].Item
+		part = list[m.editingIdx]
+		it = part.Item
 	}
 
 	// Background chip, matching how the actual zsh parts apply the color
 	// (%K{...} background, not %F{...} text color) — see carty-data's
 	// files/zsh-custom/*.zsh.
+	bg := m.picker.hex()
+	fg := "#000000"
+	title := fmt.Sprintf("배경색 고르기 — %s", it.Name)
+	if m.editingColorStage == 1 {
+		bg = part.Picker.hex()
+		fg = m.picker.hex()
+		title = fmt.Sprintf("글자색 고르기 — %s", it.Name)
+	}
+
 	preview := lipgloss.NewStyle().
 		Bold(true).
-		Background(lipgloss.Color(m.picker.hex())).
-		Foreground(lipgloss.Color("#000000")).
+		Background(lipgloss.Color(bg)).
+		Foreground(lipgloss.Color(fg)).
 		Padding(0, 1).
 		Render(partPreviewText(it))
 	body := preview + "\n\n" + renderColorPicker(m.picker, "")
 
-	return panel(fmt.Sprintf("색상 고르기 — %s", it.Name), width, height, body)
+	return panel(title, width, height, body)
 }
 
 func (m model) viewConfirm(width, height int) string {

@@ -77,12 +77,14 @@ type model struct {
 	// radio-selected item. Keyed by category id.
 	assembled map[string][]assembledPart
 
-	partsFocus       int // 0 = browsing available parts, 1 = the assembled sequence
-	partsCursor      int
-	assembledCursor  int
-	picker           colorPicker
-	editingIdx       int  // index into assembled[currentCategoryID] being colored
-	editingIsNewPart bool // true if esc should delete rather than keep the old color
+	partsFocus            int // 0 = browsing available parts, 1 = the assembled sequence
+	partsCursor           int
+	assembledCursor       int
+	picker                colorPicker
+	editingIdx            int  // index into assembled[currentCategoryID] being colored
+	editingIsNewPart      bool // true if esc should delete rather than keep the old color
+	editingNeedsFontColor bool // true if this part has a separate {{font_color}} to pick after the background
+	editingColorStage     int  // 0 = background/primary color, 1 = font/text color
 
 	searching     bool
 	searchInput   string
