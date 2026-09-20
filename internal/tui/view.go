@@ -631,20 +631,41 @@ func (m model) viewParts(height int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, panelGap, rightPanel)
 }
 
-// viewPartColor shows the color grid plus a live-colored preview of the
-// part currently being edited, so moving the cursor visibly changes what
-// that part will actually look like.
+// partPreviewText is a small sample of what a given zsh-custom part
+// actually renders in a real prompt (a stand-in for the zsh code itself,
+// since that can't be evaluated here). Keyed by FilePath since that's
+// the part's stable identity; falls back to the item's name for parts
+// this doesn't know about.
+func partPreviewText(it catalog.Item) string {
+	switch it.FilePath {
+	case "zsh-custom/user-host.zsh":
+		return "user@host"
+	case "zsh-custom/path.zsh":
+		return "~/project"
+	case "zsh-custom/git-branch.zsh":
+		return "git:(main)"
+	case "zsh-custom/prompt-char.zsh":
+		return "❯"
+	default:
+		return it.Name
+	}
+}
+
+// viewPartColor shows the color grid plus a live preview of the actual
+// part being edited (not just its name) rendered in the picker's
+// current color, so moving the cursor visibly changes what that part
+// will really look like in the prompt.
 func (m model) viewPartColor(width, height int) string {
 	list := m.assembled[m.currentCategoryID]
-	name := ""
+	var it catalog.Item
 	if m.editingIdx < len(list) {
-		name = list[m.editingIdx].Item.Name
+		it = list[m.editingIdx].Item
 	}
 
-	preview := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(m.picker.hex())).Render(name)
-	body := preview + "\n\n" + renderColorPicker(m.picker, "선택된 색")
+	preview := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(m.picker.hex())).Render(partPreviewText(it))
+	body := preview + "\n\n" + renderColorPicker(m.picker, "")
 
-	return panel(fmt.Sprintf("색상 고르기 — %s", name), width, height, body)
+	return panel(fmt.Sprintf("색상 고르기 — %s", it.Name), width, height, body)
 }
 
 func (m model) viewConfirm(width, height int) string {
