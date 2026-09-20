@@ -72,7 +72,7 @@ var (
 var screenTitles = map[screen]string{
 	screenCategories: "카테고리",
 	screenItems:      "항목 선택",
-	screenParts:      "조립",
+	screenParts:      "항목 선택",
 	screenPartColor:  "색상 고르기",
 	screenConfirm:    "적용 확인",
 	screenCorrupt:    "마커 손상 감지",
@@ -309,7 +309,7 @@ func (m model) footerHint() string {
 	case screenItems:
 		return "←/h 뒤로 · space/enter 담기/빼기 · / 검색 · a 적용 확인 · q 종료"
 	case screenParts:
-		return "tab 목록/조립 전환 · enter 담기·색 편집 · J/K 순서 이동 · x 빼기 · ←/h 뒤로 · a 적용 확인 · q 종료"
+		return "tab 목록/장바구니 전환 · enter 담기·색 편집 · J/K 순서 이동 · x 빼기 · ←/h 뒤로 · a 적용 확인 · q 종료"
 	case screenPartColor:
 		return "hjkl/방향키 색 이동 · enter 확정 · esc 취소"
 	case screenConfirm:
@@ -626,7 +626,7 @@ func (m model) viewParts(height int) string {
 			right.WriteString("\n")
 		}
 	}
-	rightPanel := panel("조립된 순서", rightWidth, height, strings.TrimRight(right.String(), "\n"))
+	rightPanel := panel("장바구니", rightWidth, height, strings.TrimRight(right.String(), "\n"))
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, panelGap, rightPanel)
 }
