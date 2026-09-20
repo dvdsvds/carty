@@ -1,0 +1,50 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build release binaries
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            out="dist/carty_linux_${arch}"
+            echo "building ${out}"
+            GOOS=linux GOARCH="${arch}" CGO_ENABLED=0 \
+              go build -trimpath -ldflags "-s -w -X main.version=${TAG}" \
+              -o "${out}" ./cmd/carty
+          done
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum carty_linux_amd64 carty_linux_arm64 > SHA256SUMS
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/carty_linux_amd64
+            dist/carty_linux_arm64
+            dist/SHA256SUMS
+          generate_release_notes: true

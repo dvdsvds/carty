@@ -1,0 +1,13 @@
+# Added by stoke
+.stoke/
+
+# scratch/local files
+.tmp
+
+# build output
+/carty
+/dist/
+*.exe
+
+# OS/editor cruft
+.DS_Store

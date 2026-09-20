@@ -1,0 +1,7 @@
+[project]
+name = "carty"
+version = "0.1.0"
+lock_mode = "commit"
+
+[targets.carty]
+language = "go"
