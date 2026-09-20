@@ -360,7 +360,7 @@ func (m *model) buildPlan() {
 			continue
 		}
 		m.plan = append(m.plan, planEntry{
-			Item:       catalog.Item{Name: fmt.Sprintf("%s (%d개 부품)", cat.Label, len(parts)), CategoryID: categoryID},
+			Item:       catalog.Item{Name: fmt.Sprintf("%s (%d개 항목)", cat.Label, len(parts)), CategoryID: categoryID},
 			Category:   cat,
 			TargetFile: catalog.ResolveTargetFile(cat, m.home),
 			Parts:      parts,

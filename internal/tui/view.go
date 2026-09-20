@@ -72,7 +72,7 @@ var (
 var screenTitles = map[screen]string{
 	screenCategories: "카테고리",
 	screenItems:      "항목 선택",
-	screenParts:      "부품 조립",
+	screenParts:      "조립",
 	screenPartColor:  "색상 고르기",
 	screenConfirm:    "적용 확인",
 	screenCorrupt:    "마커 손상 감지",
@@ -597,7 +597,7 @@ func (m model) viewParts(height int) string {
 	parts := m.currentItemList()
 	var left strings.Builder
 	if len(parts) == 0 {
-		left.WriteString(mutedStyle.Render("사용 가능한 부품이 없습니다."))
+		left.WriteString(mutedStyle.Render("사용 가능한 항목이 없습니다."))
 	} else {
 		for i, it := range parts {
 			focused := m.partsFocus == 0 && m.partsCursor == i
@@ -607,12 +607,12 @@ func (m model) viewParts(height int) string {
 			}
 		}
 	}
-	leftPanel := panel("사용 가능한 부품", leftWidth, height, left.String())
+	leftPanel := panel("사용 가능한 항목", leftWidth, height, left.String())
 
 	assembled := m.assembled[m.currentCategoryID]
 	var right strings.Builder
 	if len(assembled) == 0 {
-		right.WriteString(mutedStyle.Render("아직 담긴 부품이 없습니다.\n왼쪽에서 space/enter로 담아보세요."))
+		right.WriteString(mutedStyle.Render("아직 담긴 항목이 없습니다.\n왼쪽에서 space/enter로 담아보세요."))
 	} else {
 		rightInner := rightWidth - 6
 		for i, ap := range assembled {
@@ -642,7 +642,7 @@ func (m model) viewPartColor(width, height int) string {
 	}
 
 	preview := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(m.picker.hex())).Render(name)
-	body := preview + "\n\n" + renderColorPicker(m.picker, "이 부품의 색")
+	body := preview + "\n\n" + renderColorPicker(m.picker, "선택된 색")
 
 	return panel(fmt.Sprintf("색상 고르기 — %s", name), width, height, body)
 }
