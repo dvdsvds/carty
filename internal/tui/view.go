@@ -662,7 +662,15 @@ func (m model) viewPartColor(width, height int) string {
 		it = list[m.editingIdx].Item
 	}
 
-	preview := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(m.picker.hex())).Render(partPreviewText(it))
+	// Background chip, matching how the actual zsh parts apply the color
+	// (%K{...} background, not %F{...} text color) — see carty-data's
+	// files/zsh-custom/*.zsh.
+	preview := lipgloss.NewStyle().
+		Bold(true).
+		Background(lipgloss.Color(m.picker.hex())).
+		Foreground(lipgloss.Color("#000000")).
+		Padding(0, 1).
+		Render(partPreviewText(it))
 	body := preview + "\n\n" + renderColorPicker(m.picker, "")
 
 	return panel(fmt.Sprintf("색상 고르기 — %s", it.Name), width, height, body)
